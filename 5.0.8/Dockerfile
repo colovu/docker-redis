@@ -3,7 +3,7 @@ FROM endial/ubuntu:v18.04
 LABEL \
 	"Version"="v5.0.8" \
 	"Description"="Docker image for Redis 5.0.8 based on Ubuntu 18.04." \
-	"Dockerfile"="https://github.com/endial/docker-libs" \
+	"Dockerfile"="https://github.com/endial/docker-redis" \
 	"Vendor"="Endial Fang (endial@126.com)"
 
 ENV REDIS_VERSION 5.0.8
