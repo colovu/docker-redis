@@ -1,25 +1,19 @@
 FROM endial/ubuntu:v18.04
 
-ENV APP_NAME		redis
-ENV APP_EXEC		redis-server
-ENV APP_USER		redis
-ENV APP_GROUP		redis
-
 ENV APP_MAJOR       5.0.8
-ENV APP_DOWNLOAD_URL http://download.redis.io/releases/redis-5.0.8.tar.gz
 ENV APP_DOWNLOAD_SHA f3c7eac42f433326a8d981b50dba0169fdfaf46abb23fcda2f933a7552ee4ed7
 
 LABEL \
 	"Version"="v${APP_MAJOR}" \
-	"Description"="Docker image for ${APP_NAME} ${APP_MAJOR} based on Ubuntu 18.04." \
-	"Dockerfile"="https://github.com/endial/docker-${APP_NAME}" \
+	"Description"="Docker image for Redis ${APP_MAJOR} based on Ubuntu 18.04." \
+	"Dockerfile"="https://github.com/endial/docker-redis" \
 	"Vendor"="Endial Fang (endial@126.com)"
 
 RUN set -eux; \
-	groupadd -r ${APP_GROUP}; \
-	useradd -r -g ${APP_GROUP} -s /usr/sbin/nologin -d /usr/cache/${APP_NAME} ${APP_USER}; \
+	groupadd -r redis; \
+	useradd -r -g redis -s /usr/sbin/nologin -d /usr/cache/redis redis; \
 	\
-	mkdir -p /etc/${APP_NAME}/default /srv/conf/${APP_NAME} /srv/data/${APP_NAME} /var/log/${APP_NAME} /var/run/${APP_NAME}; \
+	mkdir -p /etc/redis/default /srv/conf/redis /srv/data/redis /var/log/redis /var/run/redis; \
 	\
 	fetchDeps=" \
 		autoconf \
@@ -34,7 +28,7 @@ RUN set -eux; \
 	apt-get -y update; \
 	apt-get -y install --no-install-recommends $fetchDeps; \
 	\
-	wget -O redis.tar.gz "$APP_DOWNLOAD_URL"; \
+	wget -O redis.tar.gz "http://download.redis.io/releases/redis-${APP_MAJOR}.tar.gz"; \
 	echo "$APP_DOWNLOAD_SHA *redis.tar.gz" | sha256sum -c -; \
 	mkdir -p /usr/src/redis; \
 	tar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1; \
@@ -58,9 +52,9 @@ RUN set -eux; \
 	\
 	ln -sf /srv/conf/redis/redis.conf /etc/redis/redis.conf; \
 	ln -sf /srv/conf/redis/sentinel.conf /etc/redis/sentinel.conf; \
-	chown -Rf ${APP_USER}:${APP_GROUP} /etc/${APP_NAME} /srv/conf/${APP_NAME} /srv/data/${APP_NAME} /var/log/${APP_NAME} /var/run/${APP_NAME}; \
+	chown -Rf redis:redis /etc/redis /srv/conf/redis /srv/data/redis /var/log/redis /var/run/redis; \
 # this 777 will be replaced by 700 or 755 at runtime (allows semi-arbitrary "--user" values)
-	chmod 777 /etc/${APP_NAME} /srv/conf/${APP_NAME} /srv/data/${APP_NAME} /var/log/${APP_NAME} /var/run/${APP_NAME}; \
+	chmod 777 /etc/redis /srv/conf/redis /srv/data/redis /var/log/redis /var/run/redis; \
 	\
 	apt purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false ${fetchDeps}; \
 	apt autoclean -y; \
