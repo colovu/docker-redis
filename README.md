@@ -36,7 +36,7 @@
 创建以上相应的宿主机目录后，容器启动命令中对应的映射参数类似如下：
 
 ```dockerfile
--v /opt/conf:/srv/conf -v /srv/data:/srv/data -v /srv/log:/var/log
+-v /host/dir/for/conf:/srv/conf -v /host/dir/for/data:/srv/data -v /host/dir/for/log:/var/log
 ```
 
 > 注意：应用需要使用的子目录会自动创建。
