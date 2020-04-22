@@ -21,7 +21,7 @@ LOG_E() {
 	exit 1
 }
 
-LOG_I "Initial container for redis"
+LOG_I "Initial container for Redis"
 
 # 检测当前脚本是被直接执行的，还是从其他脚本中使用 "source" 调用的
 _is_sourced() {
