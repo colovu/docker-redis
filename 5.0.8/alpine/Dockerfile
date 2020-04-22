@@ -1,4 +1,4 @@
-FROM endial/alpine:v3.11
+FROM endial/alpine:3.11
 
 LABEL \
 	"Version"="v5.0.8" \
@@ -10,15 +10,15 @@ ENV REDIS_VERSION 5.0.8
 ENV REDIS_DOWNLOAD_URL http://download.redis.io/releases/redis-5.0.8.tar.gz
 ENV REDIS_DOWNLOAD_SHA f3c7eac42f433326a8d981b50dba0169fdfaf46abb23fcda2f933a7552ee4ed7
 
-RUN addgroup -S -g 1000 redis; \
-	adduser -S -G redis -u 1000 redis; \
+RUN set -eux; \
+	addgroup -S redis; \
+	adduser -S -G redis -s /sbin/nologin redis; \
 	\
 	apk add --no-cache \
 		'su-exec>=0.2' \
 		tzdata \
 	; \
 	\
-	set -eux; \
 	\
 	apk add --no-cache --virtual .build-deps \
 		coreutils \

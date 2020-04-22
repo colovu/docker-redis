@@ -6,11 +6,11 @@
 
 ## 基本信息
 
-* 镜像地址：endial/redis:v5.0.8
-  * 依赖镜像：endial/ubuntu:v18.04
+* 镜像地址：endial/redis:5.0.8
+  * 依赖镜像：endial/ubuntu:18.04
 
-- 镜像地址：endial/redis-alpine:v5.0.8
-  - 依赖镜像：endial/alpine:v3.11
+- 镜像地址：endial/redis-alpine:5.0.8
+  - 依赖镜像：endial/alpine:3.11
 
 
 
@@ -58,7 +58,7 @@ docker run -d --name redis \
   -v /host/dir/for/conf:/srv/conf \
   -v /host/dir/for/log:/var/log \
   -v /host/dir/for/run:/var/run \
-  endial/redis:v5.0.8 
+  endial/redis:5.0.8 
 ```
 
 
@@ -72,7 +72,7 @@ docker run -d --name redis \
   -v /host/dir/for/conf:/srv/conf \
   -v /host/dir/for/log:/var/log \
   -v /host/dir/for/run:/var/run \
-  endial/redis:v5.0.8 redis-server /srv/conf/redis/redis.conf --appendonly yes
+  endial/redis:5.0.8 redis-server /srv/conf/redis/redis.conf --appendonly yes
 ```
 
 - `redis-server /srv/conf/redis/redis.conf`：用于以指定的配置文件创建容器，路径不可修改（为容器中路径）
@@ -87,7 +87,7 @@ docker run -d --name redis \
 docker run -d --name redis \
   -p 6379:6379 \
   --volumes-from dvc \
-  endial/redis:v5.0.8 
+  endial/redis:5.0.8 
 ```
 
 
