@@ -1,7 +1,7 @@
 FROM endial/ubuntu:18.04
 
-ENV APP_MAJOR       5.0.8
-ENV APP_DOWNLOAD_SHA f3c7eac42f433326a8d981b50dba0169fdfaf46abb23fcda2f933a7552ee4ed7
+ENV APP_MAJOR=5.0.8 \
+	APP_DOWNLOAD_SHA f3c7eac42f433326a8d981b50dba0169fdfaf46abb23fcda2f933a7552ee4ed7
 
 LABEL \
 	"Version"="v${APP_MAJOR}" \
