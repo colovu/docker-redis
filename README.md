@@ -1,16 +1,15 @@
 # Redis
 
-针对Redis的 Docker 镜像，用于提供 Redis 服务。
+针对 Redis 的 Docker 镜像，用于提供 Redis 服务。
 
+**版本信息：**
 
+- 5.0、5.0.8、latest
 
-## 基本信息
+**镜像信息：**
 
-* 镜像地址：endial/redis:5.0.8
-  * 依赖镜像：endial/ubuntu:18.04
-
-- 镜像地址：endial/redis-alpine:5.0.8
-  - 依赖镜像：endial/alpine:3.11
+* 镜像地址：colovu/redis:latest
+  * 依赖镜像：colovu/ubuntu:latest
 
 
 
@@ -58,7 +57,7 @@ docker run -d --name redis \
   -v /host/dir/for/conf:/srv/conf \
   -v /host/dir/for/log:/var/log \
   -v /host/dir/for/run:/var/run \
-  endial/redis:5.0.8 
+  colovu/redis:latest 
 ```
 
 
@@ -72,7 +71,7 @@ docker run -d --name redis \
   -v /host/dir/for/conf:/srv/conf \
   -v /host/dir/for/log:/var/log \
   -v /host/dir/for/run:/var/run \
-  endial/redis:5.0.8 redis-server /srv/conf/redis/redis.conf --appendonly yes
+  colovu/redis:latest redis-server /srv/conf/redis/redis.conf --appendonly yes
 ```
 
 - `redis-server /srv/conf/redis/redis.conf`：用于以指定的配置文件创建容器，路径不可修改（为容器中路径）
@@ -87,7 +86,7 @@ docker run -d --name redis \
 docker run -d --name redis \
   -p 6379:6379 \
   --volumes-from dvc \
-  endial/redis:5.0.8 
+  colovu/redis:latest 
 ```
 
 
@@ -121,5 +120,5 @@ docker stop redis
 
 ----
 
-本文原始来源 [Endial Fang](https://github.com/endial) @ [Github.com](https://github.com)
+本文原始来源 [Endial Fang](https://github.com/colovu) @ [Github.com](https://github.com)
 

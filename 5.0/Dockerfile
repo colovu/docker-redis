@@ -1,15 +1,18 @@
-FROM endial/ubuntu:18.04
+FROM colovu/ubuntu:18.04
 
 ENV APP_MAJOR=5.0.8 \
-	APP_DOWNLOAD_SHA=f3c7eac42f433326a8d981b50dba0169fdfaf46abb23fcda2f933a7552ee4ed7
+	APP_DOWNLOAD_SHA='f3c7eac42f433326a8d981b50dba0169fdfaf46abb23fcda2f933a7552ee4ed7'
 
 LABEL \
 	"Version"="v${APP_MAJOR}" \
 	"Description"="Docker image for Redis ${APP_MAJOR} based on Ubuntu 18.04." \
-	"Dockerfile"="https://github.com/endial/docker-redis" \
+	"Dockerfile"="https://github.com/colovu/docker-redis" \
 	"Vendor"="Endial Fang (endial@126.com)"
 
 RUN set -eux; \
+# 启用非交互模式安装软件包，规避Readline/Teletype等警告
+	export DEBIAN_FRONTEND=noninteractive; \
+	\
 	groupadd -r redis; \
 	useradd -r -g redis -s /usr/sbin/nologin -d /usr/cache/redis redis; \
 	\
@@ -25,6 +28,7 @@ RUN set -eux; \
 		ca-certificates \
 		wget \
 	"; \
+	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get -y update; \
 	apt-get -y install --no-install-recommends $fetchDeps; \
 	\
@@ -53,13 +57,23 @@ RUN set -eux; \
 	ln -sf /srv/conf/redis/redis.conf /etc/redis/redis.conf; \
 	ln -sf /srv/conf/redis/sentinel.conf /etc/redis/sentinel.conf; \
 	chown -Rf redis:redis /etc/redis /srv/conf/redis /srv/data/redis /var/log/redis /var/run/redis; \
-# this 777 will be replaced by 700 or 755 at runtime (allows semi-arbitrary "--user" values)
 	chmod 777 /etc/redis /srv/conf/redis /srv/data/redis /var/log/redis /var/run/redis; \
 	\
-	apt purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false ${fetchDeps}; \
+# 查找新安装的应用相应的依赖软件包，并表示为'manual'，防止后续自动清理时被删除
+	apt-mark auto '.*' > /dev/null; \
+	{ [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark; }; \
+	find /usr/local -type f -executable -exec ldd '{}' ';' \
+		| awk '/=>/ { print $(NF-1) }' \
+		| sort -u \
+		| xargs -r dpkg-query --search \
+		| cut -d: -f1 \
+		| sort -u \
+		| xargs -r apt-mark manual; \
+# 删除临时软件包，清理缓存	apt purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false ${fetchDeps}; \
 	apt autoclean -y; \
 	rm -rf /var/lib/apt/lists/*; \
 	\
+# 验证新安装的软件是否工作正常
 	redis-cli --version; \
 	redis-server --version
 
