@@ -259,6 +259,7 @@ redis_disable_unsafe_commands() {
     # before passing to redis_disable_unsafe_commands
     read -r -a disabledCommands <<< "$(tr ',' ' ' <<< "$REDIS_DISABLE_COMMANDS")"
     LOG_D "Disabling commands: ${disabledCommands[*]}"
+    echo "" >> "${REDIS_CONF_FILE}"
     for cmd in "${disabledCommands[@]}"; do
         if grep -E -q "^\s*rename-command\s+$cmd\s+\"\"\s*$" "${REDIS_CONF_FILE}"; then
             LOG_D "$cmd was already disabled"
