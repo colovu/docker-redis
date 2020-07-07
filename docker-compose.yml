@@ -1,0 +1,11 @@
+version: '3.6'
+
+services:
+  redis:
+    image: 'colovu/redis:latest'
+    ports:
+      - '6379:6379'
+    environment:
+      # REDIS_ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - REDIS_ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL

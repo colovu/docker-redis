@@ -1,0 +1,27 @@
+version: '3.6'
+
+# 可以使用 scale 动态扩容容器：docker-compose up -d --scale redis-primary=1 --scale redis-replica=3
+
+services:
+  redis-primary:
+    image: 'colovu/redis:latest'
+    ports:
+      - '6379:6379'
+    environment:
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_PASSWORD=colovu
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+
+  redis-replica:
+    image: 'colovu/redis:latest'
+    ports:
+      - '6379'
+    environment:
+      - REDIS_REPLICATION_MODE=slave
+      - REDIS_MASTER_HOST=redis-primary
+      - REDIS_MASTER_PORT_NUMBER=6379
+      - REDIS_MASTER_PASSWORD=colovu
+      - REDIS_PASSWORD=colovu
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    depends_on:
+      - redis-primary
