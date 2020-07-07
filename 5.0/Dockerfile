@@ -1,7 +1,7 @@
 FROM colovu/ubuntu:18.04
 
 ARG app_ver=5.0.8
-ARG LOCAL_SERVER=http://172.29.14.108/dist-files/
+#ARG LOCAL_SERVER=http://172.29.14.108/dist-files/
 
 ENV APP_NAME=redis \
 	APP_EXEC=redis-server \
