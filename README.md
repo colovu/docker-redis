@@ -145,19 +145,19 @@ Redis 镜像默认配置了用于存储数据的数据卷 `/srv/data`及用于�
 生成并运行一个新的容器：
 
 ```shell
-$ docker run -d --name redis -p 6379:6379 -e REDIS_ALLOW_EMPTY_PASSWORD=yes colovu/redis:latest
+$ docker run -d --name redis -p 6379:6379 -e ALLOW_EMPTY_PASSWORD=yes colovu/redis:latest
 ```
 
 - `-d`: 使用服务方式启动容器
 - `--name redis`: 为当前容器命名
-- `-e REDIS_ALLOW_EMPTY_PASSWORD=yes`: 设置默认允许任意用户登录（调试时使用，生产系统应当使用认证）
+- `-e ALLOW_EMPTY_PASSWORD=yes`: 设置默认允许任意用户登录（调试时使用，生产系统应当使用认证）
 
 
 
 使用数据卷映射生成并运行一个容器：
 
 ```shell
- $ docker run -d --name redis -e REDIS_ALLOW_EMPTY_PASSWORD=yes \
+ $ docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes \
  	-p 6379:6379 \
   -v /host/dir/to/data:/srv/data \
   -v /host/dir/to/datalog:/srv/datalog \
@@ -176,7 +176,7 @@ $ docker run -d --name redis -p 6379:6379 -e REDIS_ALLOW_EMPTY_PASSWORD=yes colo
 使用已定义网络`app-tier`，启动 Redis 容器：
 
 ```shell
-$ docker run -d --name redis -e REDIS_ALLOW_EMPTY_PASSWORD=yes \
+$ docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes \
 	-p 6379:6379 \
 	--network app-tier \
 	colovu/redis:latest
@@ -209,7 +209,7 @@ services:
     ports:
     	- 6379:6379
     environment:
-    	- REDIS_ALLOW_EMPTY_PASSWORD=yes
+    	- ALLOW_EMPTY_PASSWORD=yes
     networks:
       - app-tier
   myapp:
@@ -314,7 +314,7 @@ services:
     ports:
       - '6379:6379'
     environment:
-      - REDIS_ALLOW_EMPTY_PASSWORD=yes
+      - ALLOW_EMPTY_PASSWORD=yes
       - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
 ```
 
@@ -503,7 +503,7 @@ $ docker run -d --restart always -e "REDIS_INIT_LIMIT=10" --name zoo1 colovu/zoo
 
 默认值：**redis**。设置应用的默认运行用户组。
 
-#### `REDIS_ALLOW_EMPTY_PASSWORD`
+#### `ALLOW_EMPTY_PASSWORD`
 
 默认值：**no**。设置是否允许无密码连接。如果没有设置`REDIS_PASSWORD`，则必须设置当前环境变量为 `yes`。
 
@@ -651,7 +651,7 @@ $ docker-compose restart redis
 Redis 镜像默认禁用了无密码访问功能，在实际生产环境中建议使用用户名及密码控制访问；如果为了测试需要，可以使用以下环境变量启用无密码访问功能：
 
 ```shell
-REDIS_ALLOW_EMPTY_PASSWORD=yes
+ALLOW_EMPTY_PASSWORD=yes
 ```
 
 
