@@ -66,10 +66,10 @@ $ docker-compose up -d
 
 ## 容器配置
 
-在初始化 redis 容器时，如果配置文件`zoo.cfg`不存在，可以在命令行中使用相应参数对默认参数进行修改。类似命令如下：
+在初始化 Redis 容器时，如果没有预置配置文件，可以在命令行中设置相应环境变量对默认参数进行修改。类似命令如下：
 
 ```shell
-$ docker run -d --restart always -e "REDIS_INIT_LIMIT=10" --name zoo1 colovu/zookeeper:latest
+$ docker run -d -e "REDIS_AOF_ENABLED=no" --name redis colovu/redis:latest
 ```
 
 
