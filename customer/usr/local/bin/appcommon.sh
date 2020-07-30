@@ -10,6 +10,7 @@
 . /usr/local/scripts/libos.sh
 . /usr/local/scripts/libservice.sh
 . /usr/local/scripts/libvalidations.sh
+. /usr/local/scripts/libnet.sh
 
 # 函数列表
 
@@ -72,6 +73,11 @@ EOF
         cat <<"EOF"
 export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
 EOF
+    fi
+
+    # 如果设置了用户密码，设置环境变量 REDISCLI_AUTH，用于 `redis-cli` 登录时使用；不显示输入，保证安全
+    if [[ -n "${REDIS_PASSWORD}" ]]; then
+        export REDISCLI_AUTH=${REDIS_PASSWORD}
     fi
 }
 
