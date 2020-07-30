@@ -4,7 +4,6 @@
 # 应用通用业务处理函数
 
 # 加载依赖脚本
-#. /usr/local/scripts/liblog.sh          # 日志输出函数库
 . /usr/local/scripts/libcommon.sh       # 通用函数库
 . /usr/local/scripts/libfile.sh
 . /usr/local/scripts/libfs.sh
@@ -28,19 +27,11 @@ export ENV_DEBUG=${ENV_DEBUG:-false}
 export ALLOW_EMPTY_PASSWORD="${ALLOW_EMPTY_PASSWORD:-no}"
 
 # Paths
-export REDIS_BASE_DIR="${REDIS_BASE_DIR:-${APP_BASE_DIR}}"
-export REDIS_DATA_DIR="${REDIS_DATA_DIR:-${APP_DATA_DIR}}"
-export REDIS_DATALOG_DIR="${REDIS_DATALOG_DIR:-${APP_DATA_LOG_DIR}}"
-export REDIS_CONF_DIR="${REDIS_CONF_DIR:-${APP_CONF_DIR}}"
-export REDIS_LOG_DIR="${REDIS_LOG_DIR:-${APP_LOG_DIR}}"
-export REDIS_BIN_DIR="${REDIS_BIN_DIR:-${REDIS_BASE_DIR}/bin}"
-
-export REDIS_CONF_FILE="${REDIS_CONF_DIR}/redis.conf"
-export REDIS_PID_FILE="${APP_RUN_DIR}/redis_6379.pid"
+export REDIS_CONF_FILE="${APP_CONF_DIR}/redis.conf"
+export REDIS_PID_FILE="${APP_RUN_DIR}/redis.pid"
+export REDIS_SENTINEL_FILE="${APP_CONF_DIR}/sentinel.conf"
 
 # Users
-export REDIS_DAEMON_USER="${REDIS_DAEMON_USER:-${APP_USER}}"
-export REDIS_DAEMON_GROUP="${REDIS_DAEMON_GROUP:-${APP_GROUP}}"
 
 # Redis settings
 export REDIS_PORT="${REDIS_PORT:-6379}"
@@ -115,7 +106,7 @@ redis_common_conf_set() {
             # Update the existing key
             replace_in_file "$file" "^[# ]*${key} .*" "${key} ${value}" false
         else
-            # Add a new key
+            # 增加一个新的配置项；如果在其他位置有类似操作，需要注意换行
             printf "\n%s %s" "$key" "$value" >>"$file"
         fi
     fi
@@ -149,7 +140,7 @@ redis_conf_set() {
 #   $1 - 变量
 #   $2 - 值（列表）
 redis_sentinel_conf_set() {
-    redis_common_conf_set "${REDIS_CONF_DIR}/sentinel.conf" "$@"
+    redis_common_conf_set "${APP_CONF_DIR}/sentinel.conf" "$@"
 }
 
 # 更新 redis.conf 配置文件中指定变量值，取消关键字设置信息
@@ -174,20 +165,6 @@ redis_version() {
 #   Redis 主版本号
 redis_major_version() {
     redis_version | grep -E -o "^[0-9]+"
-}
-
-# 加载在后续脚本命令中使用的参数信息，包括从"*_FILE"文件中导入的配置
-# 必须在其他函数使用前调用
-docker_setup_env() {
-	# 尝试从文件获取环境变量的值
-	# file_env 'ENV_VAR_NAME'
-
-	# 尝试从文件获取环境变量的值，如果不存在，使用默认值 default_val 
-	# file_env 'ENV_VAR_NAME' 'default_val'
-
-	# 检测变量 ENV_VAR_NAME 未定义或值为空，赋值为默认值：default_val
-	# : "${ENV_VAR_NAME:=default_val}"
-    : 
 }
 
 # 禁用 Redis 不安全的命令
@@ -215,8 +192,8 @@ redis_disable_unsafe_commands() {
 #   REDIS_*
 redis_generate_conf() {
     redis_conf_set port "$REDIS_PORT"
-    redis_conf_set dir "${REDIS_DATA_DIR}"
-    redis_conf_set logfile "${REDIS_LOG_DIR}/redis.log" # Log to stdout
+    redis_conf_set dir "${APP_DATA_DIR}"
+    redis_conf_set logfile "${APP_LOG_DIR}/redis.log" # Log to stdout
     redis_conf_set pidfile "${REDIS_PID_FILE}"
     redis_conf_set daemonize no
     redis_conf_set bind 127.0.0.1 # disallow remote connections when init
@@ -368,6 +345,7 @@ app_enable_remote_connections() {
 # 以后台方式启动应用服务，并等待启动就绪
 # 全局变量:
 #   REDIS_*
+#   ENV_DEBUG
 app_start_server_bg() {
     is_app_server_running && return
 
@@ -388,15 +366,18 @@ app_start_server_bg() {
         counter=$((counter - 1))
     done
 
-    # 检测端口是否就绪
+	# 通过命令或特定端口检测应用是否就绪
+    LOG_I "Checking ${APP_NAME} ready status..."
     #wait-for-port --timeout 60 "$REDIS_PORT_NUMBER"
+
+    LOG_D "${APP_NAME} is ready for service..."
 }
 
-# 停止应用后台服务
+# 停止应用服务
 # 全局变量:
 #   REDIS_PID_FILE
 app_stop_server() {
-    ! is_app_server_running && return
+    is_app_server_running || return
 
     local pass
     local port
@@ -416,12 +397,11 @@ app_stop_server() {
         "redis-cli" "${args[@]}" shutdown >/dev/null 2>&1
     fi
 
+	# 检测停止是否完成
     local counter=5
-    while is_app_server_running ; do
-        if [[ "$counter" -ne 0 ]]; then
-            break
-        fi
-        sleep 1;
+    while [[ "$counter" -ne 0 ]] && is_app_server_running; do
+        LOG_D "Waiting for ${APP_NAME} to stop..."
+        sleep 1
         counter=$((counter - 1))
     done
 }
@@ -432,21 +412,20 @@ app_stop_server() {
 # 返回值:
 #   布尔值
 is_app_server_running() {
+    LOG_D "Check if ${APP_NAME} is running..."
     local pid
     pid="$(get_pid_from_file "${REDIS_PID_FILE}")"
 
-    if [[ -z "$pid" ]]; then
-        LOG_D "${APP_NAME} is Stopped..."
+    if [[ -z "${pid}" ]]; then
         false
     else
-        LOG_D "${APP_NAME} is Running..."
-        is_service_running "$pid"
+        is_service_running "${pid}"
     fi
 }
 
 # 清理初始化应用时生成的临时文件
 app_clean_tmp_file() {
-    LOG_D "Clean ${APP_NAME} tmp files..."
+    LOG_D "Clean ${APP_NAME} tmp files for init..."
 
 }
 
@@ -455,8 +434,17 @@ app_clean_tmp_file() {
 #   APP_*
 #   REDIS_*
 app_clean_from_restart() {
-    LOG_D "Delete temp files when restart container"
+    LOG_D "Clean ${APP_NAME} tmp files for restart..."
+    local -r -a files=(
+        "/var/run/${APP_NAME}/${APP_NAME}.pid"
+    )
 
+    for file in ${files[@]}; do
+        if [[ -f "$file" ]]; then
+            LOG_I "Cleaning stale $file file"
+            rm "$file"
+        fi
+    done
 }
 
 # 应用默认初始化操作
@@ -553,7 +541,7 @@ docker_custom_init() {
     	fi
     fi
 
-    # 停止初始化时启动的后台服务
+    # 检测服务是否运行中；如果运行，则停止后台服务
 	is_app_server_running && app_stop_server
 
     # 删除第一次运行生成的临时文件
