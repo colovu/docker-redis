@@ -77,7 +77,9 @@ EOF
 
     # 如果设置了用户密码，设置环境变量 REDISCLI_AUTH，用于 `redis-cli` 登录时使用；不显示输入，保证安全
     if [[ -n "${REDIS_PASSWORD}" ]]; then
-        export REDISCLI_AUTH=${REDIS_PASSWORD}
+        cat <<"EOF"
+export REDISCLI_AUTH=${REDIS_PASSWORD}
+EOF
     fi
 }
 
