@@ -1,6 +1,6 @@
 version: '3.6'
 
-# 可以使用 scale 动态扩容容器：docker-compose up -d --scale redis-primary=1 --scale redis-replica=3
+# 可以使用 scale 动态扩容容器：docker-compose scale redis-replica=3
 
 services:
   redis-primary:
