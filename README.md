@@ -112,12 +112,12 @@ $ docker run -d -e "REDIS_AOF_ENABLED=no" --name redis colovu/redis:latest
 使用证书加密传输时，相关配置参数如下：
 
 - **REDIS_TLS_ENABLED**：启用或禁用 TLS。默认值：**no**
- - **REDIS_TLS_PORT**：使用 TLS 加密传输的端口。默认值：**6379**
- - **REDIS_TLS_CERT_FILE**：TLS 证书文件。默认值：**无**
- - **REDIS_TLS_KEY_FILE**：TLS 私钥文件。默认值：**无**
- - **REDIS_TLS_CA_FILE**：TLS 根证书文件。默认值：**无**
- - **REDIS_TLS_DH_PARAMS_FILE**：包含 DH 参数的配置文件 (DH 加密方式时需要)。默认值：**无**
- - **REDIS_TLS_AUTH_CLIENTS**：配置客户端是否需要 TLS 认证。 默认值：**yes**
+- **REDIS_TLS_PORT**：使用 TLS 加密传输的端口。默认值：**6379**
+- **REDIS_TLS_CERT_FILE**：TLS 证书文件。默认值：**无**
+- **REDIS_TLS_KEY_FILE**：TLS 私钥文件。默认值：**无**
+- **REDIS_TLS_CA_FILE**：TLS 根证书文件。默认值：**无**
+- **REDIS_TLS_DH_PARAMS_FILE**：包含 DH 参数的配置文件 (DH 加密方式时需要)。默认值：**无**
+- **REDIS_TLS_AUTH_CLIENTS**：配置客户端是否需要 TLS 认证。 默认值：**yes**
 
 当使用 TLS 时，则默认的 non-TLS 通讯被禁用。如果需要同时支持 TLS 与 non-TLS 通讯，可以使用参数`REDIS_TLS_PORT`配置容器使用不同的 TLS 端口。
 
