@@ -6,7 +6,7 @@
 
 
 
-![redis-white](img/redis-white.png)
+<img src="img/redis-white.png" alt="redis-white" style="zoom:150%;" />
 
 **版本信息：**
 
@@ -24,7 +24,7 @@
 Docker 快速启动命令：
 
 ```shell
-$ docker run -d --name redis colovu/redis:latest
+$ docker run -d --name redis -e ALLOW_EMPTY_PASSWORD=yes colovu/redis:latest
 ```
 
 Docker-Compose 快速启动命令：
@@ -33,6 +33,14 @@ Docker-Compose 快速启动命令：
 $ curl -sSL https://raw.githubusercontent.com/colovu/docker-redis/master/docker-compose.yml > docker-compose.yml
 
 $ docker-compose up -d
+```
+
+Docker-Compose 主从集群快速启动命令：
+
+```shell
+$ curl -sSL https://raw.githubusercontent.com/colovu/docker-redis/master/docker-compose-cluster.yml > docker-compose.yml
+
+$ docker-compose -f docker-compose-cluster.yml up -d
 ```
 
 
@@ -54,7 +62,7 @@ $ docker-compose up -d
 
 ```shell
 /srv/data			# Redis 数据文件，主要存放Redis持久化数据；自动创建子目录redis
-/srv/datalog	# Redis 数据操作日志文件；自动创建子目录redis
+/srv/datalog	    # Redis 数据操作日志文件；自动创建子目录redis
 /srv/conf			# Redis 配置文件；自动创建子目录redis
 /var/log			# 日志文件，日志文件名为：redis.log
 /var/run			# 进程运行PID文件，PID文件名为：redis_6379.pid、redis_sentinel.pid
