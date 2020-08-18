@@ -11,6 +11,8 @@ services:
       - REDIS_REPLICATION_MODE=master
       - REDIS_PASSWORD=colovu
       - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    volumes:
+      - 'redis_data:/srv/data'
 
   redis-replica:
     image: 'colovu/redis:latest'
@@ -25,3 +27,7 @@ services:
       - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
     depends_on:
       - redis-primary
+
+volumes:
+  redis_data:
+    driver: local

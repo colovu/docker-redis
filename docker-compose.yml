@@ -11,3 +11,9 @@ services:
       # ALLOW_EMPTY_PASSWORD is recommended only for development.
       - ALLOW_EMPTY_PASSWORD=yes
       - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    volumes:
+      - 'redis_data:/srv/data'
+
+volumes:
+  redis_data:
+    driver: local
