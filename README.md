@@ -6,12 +6,12 @@
 
 
 
-![redis-white](img/redis-white.png)
+<img src="img/redis-white.png" alt="redis-white" style="zoom:150%;" />
 
 **版本信息：**
 
-- 6.0、6.0.6、latest
-- 5.0、5.0.8
+- 6.0、latest
+- 5.0
 
 **镜像信息：**
 
@@ -24,7 +24,7 @@
 Docker 快速启动命令：
 
 ```shell
-$ docker run -d --name redis colovu/redis:latest
+$ docker run -d -e ALLOW_ANONYMOUS_LOGIN=yes colovu/redis
 ```
 
 Docker-Compose 快速启动命令：
@@ -33,6 +33,14 @@ Docker-Compose 快速启动命令：
 $ curl -sSL https://raw.githubusercontent.com/colovu/docker-redis/master/docker-compose.yml > docker-compose.yml
 
 $ docker-compose up -d
+```
+
+Docker-Compose 主从集群快速启动命令：
+
+```shell
+$ curl -sSL https://raw.githubusercontent.com/colovu/docker-redis/master/docker-compose-cluster.yml > docker-compose.yml
+
+$ docker-compose -f docker-compose-cluster.yml up -d
 ```
 
 
@@ -53,11 +61,11 @@ $ docker-compose up -d
 镜像默认提供以下数据卷定义，默认数据分别存储在自动生成的应用名对应`redis`子目录中：
 
 ```shell
-/srv/data			# Redis 数据文件，主要存放Redis持久化数据；自动创建子目录redis
-/srv/datalog	# Redis 数据操作日志文件；自动创建子目录redis
-/srv/conf			# Redis 配置文件；自动创建子目录redis
-/var/log			# 日志文件，日志文件名为：redis.log
-/var/run			# 进程运行PID文件，PID文件名为：redis_6379.pid、redis_sentinel.pid
+/srv/data           # Redis 数据文件，主要存放Redis持久化数据；自动创建子目录redis
+/srv/datalog	    # Redis 数据操作日志文件；自动创建子目录redis
+/srv/conf           # Redis 配置文件；自动创建子目录redis
+/var/log            # 日志文件，日志文件名为：redis.log
+/var/run            # 进程运行PID文件，PID文件名为：redis_6379.pid、redis_sentinel.pid
 ```
 
 如果需要持久化存储相应数据，需要**在宿主机建立本地目录**，并在使用镜像初始化容器时进行映射。宿主机相关的目录中如果不存在对应应用 Redis 的子目录或相应数据文件，则容器会在初始化时创建相应目录及文件。
@@ -69,7 +77,7 @@ $ docker-compose up -d
 在初始化 Redis 容器时，如果没有预置配置文件，可以在命令行中设置相应环境变量对默认参数进行修改。类似命令如下：
 
 ```shell
-$ docker run -d -e "REDIS_AOF_ENABLED=no" --name redis colovu/redis:latest
+$ docker run -d -e "REDIS_AOF_ENABLED=no" colovu/redis
 ```
 
 
@@ -78,7 +86,7 @@ $ docker run -d -e "REDIS_AOF_ENABLED=no" --name redis colovu/redis:latest
 
 常使用的环境变量主要包括：
 
-- **ALLOW_EMPTY_PASSWORD**：默认值：**no**。设置是否允许无密码连接。如果没有设置`REDIS_PASSWORD`，则必须设置当前环境变量为 `yes`
+- **ALLOW_ANONYMOUS_LOGIN**：默认值：**no**。设置是否允许无密码连接。如果没有设置`REDIS_PASSWORD`，则必须设置当前环境变量为 `yes`
 - **REDIS_PASSWORD**：默认值：**无**。客户端认证的密码
 - **REDIS_DISABLE_COMMANDS**：默认值：**无**。设置禁用的 Redis 命令
 - **REDIS_AOF_ENABLED**：默认值：**yes**。设置是否启用 Append Only File 存储
@@ -130,13 +138,13 @@ $ docker run -d -e "REDIS_AOF_ENABLED=no" --name redis colovu/redis:latest
 Redis 镜像默认禁用了无密码访问功能，在实际生产环境中建议使用用户名及密码控制访问；如果为了测试需要，可以使用以下环境变量启用无密码访问功能：
 
 ```shell
-ALLOW_EMPTY_PASSWORD=yes
+ALLOW_ANONYMOUS_LOGIN=yes
 ```
 
 通过配置环境变量`REDIS_PASSWORD`，可以启用基于密码的用户认证功能。命令行使用参考：
 
 ```shell
-$ docker run -d -e REDIS_PASSWORD=colovu colovu/redis:latest
+$ docker run -d -e REDIS_PASSWORD=colovu colovu/redis
 ```
 
 使用 Docker-Compose 时，`docker-compose.yml`应包含类似如下配置：
