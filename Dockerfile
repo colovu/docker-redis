@@ -27,9 +27,9 @@ RUN set -eux; \
 	chmod +x /usr/local/wait-for-port-1.0.0-1-linux-amd64-debian-10/files/common/bin/wait-for-port;
 
 RUN set -eux; \
-	appVersion=6.0.5; \
+	appVersion=6.0.8; \
 	appName="redis-${appVersion}.tar.gz"; \
-	sha256="42cf86a114d2a451b898fcda96acd4d01062a7dbaaad2801d9164a36f898f596"; \
+	sha256="04fa1fddc39bd1aecb6739dd5dd73858a3515b427acd1e2947a66dadce868d68"; \
 	[ ! -z ${local_url} ] && localURL=${local_url}/redis; \
 	appUrls="${localURL:-} \
 		http://download.redis.io/releases \
@@ -67,7 +67,7 @@ ARG local_url=""
 ENV APP_NAME=redis \
 	APP_USER=redis \
 	APP_EXEC=redis-server \
-	APP_VERSION=6.0.5
+	APP_VERSION=6.0.8
 
 ENV	APP_HOME_DIR=/usr/local/${APP_NAME} \
 	APP_DEF_DIR=/etc/${APP_NAME} \
