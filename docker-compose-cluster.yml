@@ -1,10 +1,10 @@
-version: '3.6'
+version: '3.8'
 
 # 可以使用 scale 动态扩容容器：docker-compose scale redis-replica=3
 
 services:
   redis-primary:
-    image: 'colovu/redis:latest'
+    image: 'colovu/redis'
     ports:
       - '6379:6379'
     environment:
@@ -15,7 +15,7 @@ services:
       - 'redis_data:/srv/data'
 
   redis-replica:
-    image: 'colovu/redis:latest'
+    image: 'colovu/redis'
     ports:
       - '6379'
     environment:
@@ -28,6 +28,7 @@ services:
     depends_on:
       - redis-primary
 
+# 定义本地数据卷，由系统管理，需要手动删除
 volumes:
   redis_data:
     driver: local

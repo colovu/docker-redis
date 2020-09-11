@@ -5,12 +5,12 @@
 
 # 加载依赖脚本
 . /usr/local/scripts/libcommon.sh       # 通用函数库
+
 . /usr/local/scripts/libfile.sh
 . /usr/local/scripts/libfs.sh
 . /usr/local/scripts/libos.sh
 . /usr/local/scripts/libservice.sh
 . /usr/local/scripts/libvalidations.sh
-. /usr/local/scripts/libnet.sh
 
 # 函数列表
 
@@ -21,16 +21,16 @@
 #   *_* : 应用配置文件使用的全局变量，变量名根据配置项定义
 # 返回值:
 #   可以被 'eval' 使用的序列化输出
-docker_app_env() {
-    cat <<"EOF"
+app_env() {
+    cat <<-'EOF'
 # Common Settings
 export ENV_DEBUG=${ENV_DEBUG:-false}
-export ALLOW_EMPTY_PASSWORD="${ALLOW_EMPTY_PASSWORD:-no}"
+export ALLOW_ANONYMOUS_LOGIN="${ALLOW_ANONYMOUS_LOGIN:-no}"
 
 # Paths
 export REDIS_CONF_FILE="${APP_CONF_DIR}/redis.conf"
-export REDIS_PID_FILE="${APP_RUN_DIR}/redis.pid"
 export REDIS_SENTINEL_FILE="${APP_CONF_DIR}/sentinel.conf"
+export REDIS_PID_FILE="${APP_RUN_DIR}/redis.pid"
 
 # Users
 
@@ -121,8 +121,6 @@ redis_common_conf_set() {
 }
 
 # 获取配置文件中指定关键字对应的值
-# 全局变量:
-#   APP_CONF_DIR
 # 变量:
 #   $1 - 变量
 redis_conf_get() {
@@ -132,8 +130,6 @@ redis_conf_get() {
 }
 
 # 更新 redis.conf 配置文件中指定变量值，设置关键字及对应值
-# 全局变量:
-#   APP_CONF_DIR
 # 变量:
 #   $1 - 变量
 #   $2 - 值（列表）
@@ -142,18 +138,14 @@ redis_conf_set() {
 }
 
 # 更新 sentinel.conf 配置文件中指定变量值，设置关键字及对应值
-# 全局变量:
-#   APP_CONF_DIR
 # 变量:
 #   $1 - 变量
 #   $2 - 值（列表）
 redis_sentinel_conf_set() {
-    redis_common_conf_set "${APP_CONF_DIR}/sentinel.conf" "$@"
+    redis_common_conf_set "${REDIS_SENTINEL_FILE}" "$@"
 }
 
 # 更新 redis.conf 配置文件中指定变量值，取消关键字设置信息
-# 全局变量:
-#   APP_CONF_DIR
 # 变量:
 #   $1 - 变量
 redis_conf_unset() {
@@ -162,22 +154,16 @@ redis_conf_unset() {
 }
 
 # 获取 Redis 版本信息
-# 返回值:
-#   Redis 版本号
 redis_version() {
     redis-cli --version | grep -E -o "[0-9]+.[0-9]+.[0-9]+"
 }
 
 # 获取 Redis 主版本号
-# 返回值:
-#   Redis 主版本号
 redis_major_version() {
     redis_version | grep -E -o "^[0-9]+"
 }
 
 # 禁用 Redis 不安全的命令
-# Globals:
-#   REDIS_BASEDIR
 # 参数:
 #   $1 - 待禁用的命令列表
 redis_disable_unsafe_commands() {
@@ -196,8 +182,6 @@ redis_disable_unsafe_commands() {
 }
 
 # 生成默认配置文件
-# 全局变量:
-#   REDIS_*
 redis_generate_conf() {
     redis_conf_set port "$REDIS_PORT"
     redis_conf_set dir "${APP_DATA_DIR}"
@@ -240,8 +224,6 @@ redis_generate_conf() {
 }
 
 # 配置 Redis 复制模式参数
-# 全局变量:
-#   REDIS_*
 # 参数:
 #   $1 - 复制模式
 redis_configure_replication() {
@@ -280,8 +262,6 @@ redis_configure_replication() {
 }
 
 # 检测用户参数信息是否满足条件; 针对部分权限过于开放情况，打印提示信息
-# 全局变量：
-#   REDIS_*
 app_verify_minimum_env() {
     local error_code=0
     LOG_D "Validating settings in REDIS_* env vars..."
@@ -293,10 +273,10 @@ app_verify_minimum_env() {
     }
 
     # Redis authentication validations
-    if is_boolean_yes "$ALLOW_EMPTY_PASSWORD"; then
-        LOG_W "You set the environment variable ALLOW_EMPTY_PASSWORD=${ALLOW_EMPTY_PASSWORD}. For safety reasons, do not use this flag in a production environment."
+    if is_boolean_yes "$ALLOW_ANONYMOUS_LOGIN"; then
+        LOG_W "You set the environment variable ALLOW_ANONYMOUS_LOGIN=${ALLOW_ANONYMOUS_LOGIN}. For safety reasons, do not use this flag in a production environment."
     elif [[ -z "$REDIS_PASSWORD" ]]; then
-        print_validation_error "The REDIS_PASSWORD environment variable is empty or not set. Set the environment variable ALLOW_EMPTY_PASSWORD=yes to allow the container to be started with blank passwords. This is recommended only for development."
+        print_validation_error "The REDIS_PASSWORD environment variable is empty or not set. Set the environment variable ALLOW_ANONYMOUS_LOGIN=yes to allow the container to be started with blank passwords. This is recommended only for development."
     fi
 
     if [[ -n "$REDIS_REPLICATION_MODE" ]]; then
@@ -306,8 +286,8 @@ app_verify_minimum_env() {
                     print_validation_error "An invalid port was specified in the environment variable REDIS_MASTER_PORT_NUMBER: $err"
                 fi
             fi
-            if ! is_boolean_yes "$ALLOW_EMPTY_PASSWORD" && [[ -z "$REDIS_MASTER_PASSWORD" ]]; then
-                print_validation_error "The REDIS_MASTER_PASSWORD environment variable is empty or not set. Set the environment variable ALLOW_EMPTY_PASSWORD=yes to allow the container to be started with blank passwords. This is recommended only for development."
+            if ! is_boolean_yes "$ALLOW_ANONYMOUS_LOGIN" && [[ -z "$REDIS_MASTER_PASSWORD" ]]; then
+                print_validation_error "The REDIS_MASTER_PASSWORD environment variable is empty or not set. Set the environment variable ALLOW_ANONYMOUS_LOGIN=yes to allow the container to be started with blank passwords. This is recommended only for development."
             fi
         elif [[ "$REDIS_REPLICATION_MODE" != "master" ]]; then
             print_validation_error "Invalid replication mode. Available options are 'master/replica'"
@@ -351,9 +331,6 @@ app_enable_remote_connections() {
 }
 
 # 以后台方式启动应用服务，并等待启动就绪
-# 全局变量:
-#   REDIS_*
-#   ENV_DEBUG
 app_start_server_bg() {
     is_app_server_running && return
 
@@ -382,8 +359,6 @@ app_start_server_bg() {
 }
 
 # 停止应用服务
-# 全局变量:
-#   REDIS_PID_FILE
 app_stop_server() {
     is_app_server_running || return
 
@@ -415,10 +390,6 @@ app_stop_server() {
 }
 
 # 检测应用服务是否在后台运行中
-# 全局变量:
-#   REDIS_PID_FILE
-# 返回值:
-#   布尔值
 is_app_server_running() {
     LOG_D "Check if ${APP_NAME} is running..."
     local pid
@@ -438,13 +409,10 @@ app_clean_tmp_file() {
 }
 
 # 在重新启动容器时，删除标志文件及必须删除的临时文件 (容器重新启动)
-# 全局变量:
-#   APP_*
-#   REDIS_*
 app_clean_from_restart() {
     LOG_D "Clean ${APP_NAME} tmp files for restart..."
     local -r -a files=(
-        "/var/run/${APP_NAME}/${APP_NAME}.pid"
+        "${REDIS_PID_FILE}"
     )
 
     for file in ${files[@]}; do
@@ -457,7 +425,7 @@ app_clean_from_restart() {
 
 # 应用默认初始化操作
 # 执行完毕后，生成文件 ${APP_CONF_DIR}/.app_init_flag 及 ${APP_DATA_DIR}/.data_init_flag 文件
-docker_app_init() {
+app_default_init() {
 	app_clean_from_restart
     LOG_D "Check init status of ${APP_NAME}..."
 
@@ -491,7 +459,7 @@ docker_app_init() {
 
 # 用户自定义的前置初始化操作，依次执行目录 preinitdb.d 中的初始化脚本
 # 执行完毕后，生成文件 ${APP_DATA_DIR}/.custom_preinit_flag
-docker_custom_preinit() {
+app_custom_preinit() {
     LOG_D "Check custom pre-init status of ${APP_NAME}..."
 
     # 检测用户配置文件目录是否存在 preinitdb.d 文件夹，如果存在，尝试执行目录中的初始化脚本
@@ -502,7 +470,7 @@ docker_custom_preinit() {
             LOG_I "Process custom pre-init scripts from /srv/conf/${APP_NAME}/preinitdb.d..."
 
             # 检索所有可执行脚本，排序后执行
-            find "/srv/conf/${APP_NAME}/preinitdb.d/" -type f -regex ".*\.\(sh\)" | sort | docker_process_init_files
+            find "/srv/conf/${APP_NAME}/preinitdb.d/" -type f -regex ".*\.\(sh\)" | sort | process_init_files
 
             touch ${APP_DATA_DIR}/.custom_preinit_flag
             echo "$(date '+%Y-%m-%d %H:%M:%S') : Init success." >> ${APP_DATA_DIR}/.custom_preinit_flag
@@ -511,24 +479,29 @@ docker_custom_preinit() {
             LOG_I "Custom preinit for ${APP_NAME} already done before, skipping initialization."
         fi
     fi
+
+    # 检测依赖的服务是否就绪
+    #for i in ${SERVICE_PRECONDITION[@]}; do
+    #    app_wait_service "${i}"
+    #done
 }
 
 # 用户自定义的应用初始化操作，依次执行目录initdb.d中的初始化脚本
 # 执行完毕后，生成文件 ${APP_DATA_DIR}/.custom_init_flag
-docker_custom_init() {
+app_custom_init() {
     LOG_D "Check custom init status of ${APP_NAME}..."
 
     # 检测用户配置文件目录是否存在 initdb.d 文件夹，如果存在，尝试执行目录中的初始化脚本
     if [ -d "/srv/conf/${APP_NAME}/initdb.d" ]; then
     	# 检测数据存储目录是否存在已初始化标志文件；如果不存在，检索可执行脚本文件并进行初始化操作
-    	if [[ -n $(find "/srv/conf/${APP_NAME}/initdb.d/" -type f -regex ".*\.\(sh\)") ]] && \
+    	if [[ -n $(find "/srv/conf/${APP_NAME}/initdb.d/" -type f -regex ".*\.\(sh\|sql\|sql.gz\)") ]] && \
             [[ ! -f "${APP_DATA_DIR}/.custom_init_flag" ]]; then
             LOG_I "Process custom init scripts from /srv/conf/${APP_NAME}/initdb.d..."
 
             #app_start_server_bg
 
             # 检索所有可执行脚本，排序后执行
-    		find "/srv/conf/${APP_NAME}/initdb.d/" -type f -regex ".*\.\(sh\)" | sort | while read -r f; do
+    		find "/srv/conf/${APP_NAME}/initdb.d/" -type f -regex ".*\.\(sh\|sql\|sql.gz\)" | sort | while read -r f; do
                 case "$f" in
                     *.sh)
                         if [[ -x "$f" ]]; then
