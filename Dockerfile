@@ -1,23 +1,74 @@
-# Ver: 1.0 by Endial Fang (endial@126.com)
+# Ver: 1.2 by Endial Fang (endial@126.com)
 #
-# 指定原始系统镜像，常用镜像为 colovu/ubuntu:18.04、colovu/debian:10、colovu/alpine:3.12、colovu/openjdk:8u252-jre
-FROM colovu/debian:10
 
-# ARG参数使用"--build-arg"指定，如 "--build-arg apt_source=tencent"
+# 预处理 =========================================================================
+FROM colovu/dbuilder as builder
+
 # sources.list 可使用版本：default / tencent / ustc / aliyun / huawei
 ARG apt_source=default
 
-# 外部指定应用版本信息，如 "--build-arg app_ver=6.0.0"
-ARG app_ver=5.0.8
-
-# 编译镜像时指定本地服务器地址，如 "--build-arg local_url=http://172.29.14.108/dist-files/"
+# 编译镜像时指定用于加速的本地服务器地址
 ARG local_url=""
 
-# 定义应用基础常量信息，该常量在容器内可使用
-ENV APP_NAME=redis \
-	APP_EXEC=redis-server
+WORKDIR /usr/local
 
-# 定义应用基础目录信息，该常量在容器内可使用
+RUN select_source ${apt_source};
+#RUN install_pkg xz-utils
+
+# 下载并解压软件包
+RUN set -eux; \
+	appVersion=1.0.0; \
+	appName="wait-for-port-${appVersion}-1-linux-amd64-debian-10.tar.gz"; \
+	[ ! -z ${local_url} ] && localURL=${local_url}/bitnami; \
+	appUrls="${localURL:-} \
+		https://downloads.bitnami.com/files/stacksmith \
+		"; \
+	download_pkg unpack ${appName} "${appUrls}"; \
+	chmod +x /usr/local/wait-for-port-1.0.0-1-linux-amd64-debian-10/files/common/bin/wait-for-port;
+
+RUN set -eux; \
+	appVersion=5.0.8; \
+	appName="redis-${appVersion}.tar.gz"; \
+	sha256="f3c7eac42f433326a8d981b50dba0169fdfaf46abb23fcda2f933a7552ee4ed7"; \
+	[ ! -z ${local_url} ] && localURL=${local_url}/redis; \
+	appUrls="${localURL:-} \
+		http://download.redis.io/releases \
+		"; \
+	download_pkg unpack ${appName} "${appUrls}" -s "${sha256}"; \
+	mkdir -p /usr/local/redis; \
+	cd /usr/local/redis-${appVersion}; \
+# 禁用安全保护模式，在 Docker 中运行时不需要
+	grep -q '^#define CONFIG_DEFAULT_PROTECTED_MODE 1$' /usr/local/redis-${appVersion}/src/server.h; \
+	sed -ri 's!^(#define CONFIG_DEFAULT_PROTECTED_MODE) 1$!\1 0!' /usr/local/redis-${appVersion}/src/server.h; \
+	grep -q '^#define CONFIG_DEFAULT_PROTECTED_MODE 0$' /usr/local/redis-${appVersion}/src/server.h; \
+	make BUILD_TLS=yes MALLOC=libc \
+		-j "$(nproc)" all; \
+	make PREFIX=/usr/local/redis install; \
+	\
+# 删除重复的应用程序，并生成对应的连接
+	serverMd5="$(md5sum /usr/local/redis/bin/redis-server | cut -d' ' -f1)"; export serverMd5; \
+	find /usr/local/redis/bin/redis* -maxdepth 0 \
+		-type f -not -name redis-server \
+		-exec sh -eux -c ' \
+			md5="$(md5sum "$1" | cut -d" " -f1)"; \
+			test "$md5" = "$serverMd5"; \
+		' -- '{}' ';' \
+		-exec ln -svfT 'redis-server' '{}' ';' ; 
+
+
+#find /usr/local/redis/bin -type f -executable -exec ldd '{}' ';' | awk '/=>/ { print $(NF-1) }' | sort -u | xargs -r dpkg-query --search | cut -d: -f1 | sort -u
+
+# 镜像生成 ========================================================================
+FROM colovu/debian:10
+
+ARG apt_source=default
+ARG local_url=""
+
+ENV APP_NAME=redis \
+	APP_USER=redis \
+	APP_EXEC=redis-server \
+	APP_VERSION=5.0.8
+
 ENV	APP_HOME_DIR=/usr/local/${APP_NAME} \
 	APP_DEF_DIR=/etc/${APP_NAME} \
 	APP_CONF_DIR=/srv/conf/${APP_NAME} \
@@ -28,163 +79,44 @@ ENV	APP_HOME_DIR=/usr/local/${APP_NAME} \
 	APP_LOG_DIR=/var/log/${APP_NAME} \
 	APP_CERT_DIR=/srv/cert/${APP_NAME}
 
-# 设置应用需要的特定环境变量
 ENV \
 	PATH="${APP_HOME_DIR}/bin:${PATH}"
 
 LABEL \
-	"Version"="v${app_ver}" \
-	"Description"="Docker image for ${APP_NAME}(v${app_ver})." \
+	"Version"="v${APP_VERSION}" \
+	"Description"="Docker image for ${APP_NAME}(v${APP_VERSION})." \
 	"Dockerfile"="https://github.com/colovu/docker-${APP_NAME}" \
 	"Vendor"="Endial Fang (endial@126.com)"
 
-# 拷贝默认 Shell 脚本至容器相关目录中
-COPY prebuilds /
-
-# 镜像内相应应用及依赖软件包的安装脚本；以下脚本可按照不同需求拆分为多个段，但需要注意各个段在结束前需要清空缓存
-RUN \
-# 设置程序使用静默安装，而非交互模式；默认情况下，类似 tzdata/gnupg/ca-certificates 等程序配置需要交互
-	export DEBIAN_FRONTEND=noninteractive; \
-	\
-# 设置 shell 执行参数，分别为 -e(命令执行错误则退出脚本) -u(变量未定义则报错) -x(打印实际待执行的命令行)
-	set -eux; \
-	\
-# 更改源为当次编译指定的源
-	cp /etc/apt/sources.list.${apt_source} /etc/apt/sources.list; \
-	\
-# 为应用创建对应的组、用户、相关目录
-	export APP_VERSION=${app_ver}; \
-	export APP_DIRS="${APP_DEF_DIR:-} ${APP_CONF_DIR:-} ${APP_DATA_DIR:-} ${APP_CACHE_DIR:-} ${APP_RUN_DIR:-} ${APP_LOG_DIR:-} ${APP_CERT_DIR:-} ${APP_DATA_LOG_DIR:-} ${APP_HOME_DIR:-${APP_DATA_DIR}}"; \
-	mkdir -p ${APP_DIRS}; \
-	groupadd -r -g 998 ${APP_NAME}; \
-	useradd -r -g ${APP_NAME} -u 999 -s /usr/sbin/nologin -d ${APP_DATA_DIR} ${APP_NAME}; \
-	\
-# 应用软件包及依赖项。相关软件包在镜像创建完成时，不会被清理
-	appDeps=" \
-		libnss-wrapper \
-		xz-utils \
-	"; \
-	savedAptMark="$(apt-mark showmanual) ${appDeps}"; \
-	\
-	\
-	\
-# 安装临时使用的软件包及依赖项。相关软件包在镜像创建完后时，会被清理
-	fetchDeps=" \
-		wget \
-		ca-certificates \
-		\
-		autoconf \
-		automake \
-		gcc \
-		g++ \
-		gcc-multilib \
-		make \
-		\
-	"; \
-	apt-get update; \
-	apt-get install -y --no-install-recommends ${fetchDeps}; \
-	\
-	\
-	\
-# 下载需要的软件包资源。可使用 不校验、签名校验、SHA256 校验 三种方式
-	DIST_NAME="wait-for-port-1.0.0-1-linux-amd64-debian-10"; \
-	DIST_URLS=" \
-		${local_url} \
-		https://downloads.bitnami.com/files/stacksmith/ \
-		"; \
-	. /usr/local/scripts/libdownload.sh && download_dist "${DIST_NAME}.tar.gz" "${DIST_URLS}"; \
-	\
-	\
-	\
-# 二进制解压方式安装: 解压后将原始配置文件拷贝至 ${APP_DEF_DIR} 中
-	APP_BIN="/usr/local/bin"; \
-	tar --extract --file "${DIST_NAME}.tar.gz" --directory "${APP_BIN}" --strip-components 4 "${DIST_NAME}/files/common/bin/"; \
-	rm -rf "${DIST_NAME}.tar.gz" "/usr/local/bin/.buildcomplete"; \
-	\
-	\
-	\
-# 下载需要的软件包资源。可使用 不校验、签名校验、SHA256 校验 三种方式
-	DIST_NAME="${APP_NAME}-${APP_VERSION}.tar.gz"; \
-	DIST_SHA256="f3c7eac42f433326a8d981b50dba0169fdfaf46abb23fcda2f933a7552ee4ed7"; \
-	DIST_URLS=" \
-		${local_url} \
-		http://download.redis.io/releases/ \
-		"; \
-	. /usr/local/scripts/libdownload.sh && download_dist "${DIST_NAME}" "${DIST_URLS}" --checksum "${DIST_SHA256}"; \
-	\
-# 源码编译
-	APP_SRC="/usr/local/src/${APP_NAME}-${APP_VERSION}"; \
-	mkdir -p ${APP_SRC}; \
-	tar --extract --file "${DIST_NAME}" --directory "${APP_SRC}" --strip-components 1; \
-	cd ${APP_SRC}; \
-# disable Redis protected mode [1] as it is unnecessary in context of Docker
-# (ports are not automatically exposed when running inside Docker, but rather explicitly by specifying -p / -P)
-# [1]: https://github.com/antirez/redis/commit/edd4d555df57dc84265fdfb4ef59a4678832f6da
-	grep -q '^#define CONFIG_DEFAULT_PROTECTED_MODE 1$' ${APP_SRC}/src/server.h; \
-	sed -ri 's!^(#define CONFIG_DEFAULT_PROTECTED_MODE) 1$!\1 0!' ${APP_SRC}/src/server.h; \
-	grep -q '^#define CONFIG_DEFAULT_PROTECTED_MODE 0$' ${APP_SRC}/src/server.h; \
-# for future reference, we modify this directly in the source instead of just supplying a default configuration flag because apparently "if you specify any argument to redis-server, [it assumes] you are going to specify everything"
-# see also https://github.com/docker-library/redis/issues/4#issuecomment-50780840
-# (more exactly, this makes sure the default behavior of "save on SIGTERM" stays functional by default)
-	\
-	make -j "$(nproc)" all; \
-	make install; \
-	cp -rf ./*.conf ${APP_DEF_DIR}/; \
-	cd /; \
-	rm -rf ${APP_SRC} ${DIST_NAME}; \
-	\
-	\
-	\
-# 包管理方式安装: 增加软件包特有源，并使用系统包管理方式安装软件; 
-	apt-get install -y --no-install-recommends ${appDeps}; \
-	\
-	\
-	\
-# 设置应用关联目录的权限信息
-	chown -Rf ${APP_NAME}:${APP_NAME} ${APP_DIRS}; \
-	\
-# 查找新安装的应用及应用依赖软件包，并标识为'manual'，防止后续自动清理时被删除
-	apt-mark auto '.*' > /dev/null; \
-	{ [ -z "$savedAptMark" ] || apt-mark manual $savedAptMark; }; \
-	find /usr/local -type f -executable -exec ldd '{}' ';' \
-		| awk '/=>/ { print $(NF-1) }' \
-		| sort -u \
-		| xargs -r dpkg-query --search \
-		| cut -d: -f1 \
-		| sort -u \
-		| xargs -r apt-mark manual; \
-	\
-# 删除安装的临时依赖软件包，清理缓存
-	apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false ${fetchDeps}; \
-	apt-get autoclean -y; \
-	rm -rf /var/lib/apt/lists/*; \
-	:;
-
-# 拷贝应用专用 Shell 脚本至容器相关目录中
 COPY customer /
 
+# 以包管理方式安装软件包(Optional)
+RUN select_source ${apt_source}
+RUN install_pkg libssl1.1
+
+RUN create_user && prepare_env
+
+# 从预处理过程中拷贝软件包(Optional)
+COPY --from=builder /usr/local/wait-for-port-1.0.0-1-linux-amd64-debian-10/files/common/bin/ /usr/local/bin/
+COPY --from=builder /usr/local/redis /usr/local/redis
+COPY --from=builder /usr/local/redis-${APP_VERSION}/*.conf ${APP_DEF_DIR}/
+
+# 执行预处理脚本，并验证安装的软件包
 RUN set -eux; \
-# 设置容器入口脚本的可执行权限
-	chmod +x /usr/local/bin/entrypoint.sh; \
-	\
-# 检测是否存在对应版本的 overrides 脚本文件；如果存在，执行
-	{ [ ! -e "/usr/local/overrides/overrides-${app_ver}.sh" ] || /bin/bash "/usr/local/overrides/overrides-${app_ver}.sh"; }; \
-	\
-# 验证安装的软件是否可以正常运行，常规情况下放置在命令行的最后
-	gosu ${APP_NAME} redis-cli --version; \
-	gosu ${APP_NAME} redis-server --version; \
+	override_file="/usr/local/overrides/overrides-${APP_VERSION}.sh"; \
+	[ -e "${override_file}" ] && /bin/bash "${override_file}"; \
+	gosu ${APP_USER} redis-cli --version; \
+	gosu ${APP_USER} redis-server --version; \
 	:;
 
 # 默认提供的数据卷
-VOLUME ["/srv/conf", "/srv/data", "/srv/cert", "/srv/datalog", "/var/log"]
+VOLUME ["/srv/conf", "/srv/data", "/srv/datalog", "/srv/cert", "/var/log"]
 
 # 默认使用gosu切换为新建用户启动，必须保证端口在1024之上
 EXPOSE 6379
 
-# 容器初始化命令，默认存放在：/usr/local/bin/entrypoint.sh
-ENTRYPOINT ["entrypoint.sh"]
-
-WORKDIR ${APP_DATA_DIR}
+# 容器初始化命令，默认存放在：/usr/local/bin/entry.sh
+ENTRYPOINT ["entry.sh"]
 
 # 应用程序的服务命令，必须使用非守护进程方式运行。如果使用变量，则该变量必须在运行环境中存在（ENV可以获取）
 CMD ["${APP_EXEC}", "${REDIS_CONF_FILE}"]

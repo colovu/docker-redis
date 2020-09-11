@@ -1,13 +1,20 @@
-version: '3.6'
+version: '3.8'
 
 # Docker-Compose 单容器使用参考 YAML 配置文件
 # 更多配置参数请参考镜像 README.md 文档中说明
 services:
   redis:
-    image: 'colovu/redis:latest'
+    image: 'colovu/redis'
     ports:
       - '6379:6379'
     environment:
-      # ALLOW_EMPTY_PASSWORD is recommended only for development.
-      - ALLOW_EMPTY_PASSWORD=yes
+      # ALLOW_ANONYMOUS_LOGIN is recommended only for development.
+      - ALLOW_ANONYMOUS_LOGIN=yes
       - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    volumes:
+      - 'redis_data:/srv/data'
+
+# 定义本地数据卷，由系统管理，需要手动删除
+volumes:
+  redis_data:
+    driver: local
