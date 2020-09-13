@@ -44,7 +44,7 @@ clean:
 # 为了防止删除前缀名相同的镜像，在过滤条件中加入一个空格进行过滤
 clearclean: clean
 	@echo "Clean all images for current application..."
-	@docker images | grep "$(app_name) " | awk '{print $$3}' | xargs docker rmi -f | :
+	docker images | grep "$(app_name) " | awk '{print $$3}' | xargs docker rmi -f | :
 
 tag:
 	@echo "Add tag: $(local_registory)/$(app_name):latest"
