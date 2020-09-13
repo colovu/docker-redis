@@ -92,7 +92,7 @@ COPY customer /
 
 # 以包管理方式安装软件包(Optional)
 RUN select_source ${apt_source}
-RUN install_pkg libssl1.1
+#RUN install_pkg libssl1.1
 
 RUN create_user && prepare_env
 
@@ -120,3 +120,4 @@ ENTRYPOINT ["entry.sh"]
 
 # 应用程序的服务命令，必须使用非守护进程方式运行。如果使用变量，则该变量必须在运行环境中存在（ENV可以获取）
 CMD ["${APP_EXEC}", "${REDIS_CONF_FILE}"]
+
