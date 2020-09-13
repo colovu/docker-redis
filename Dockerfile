@@ -92,7 +92,7 @@ COPY customer /
 
 # 以包管理方式安装软件包(Optional)
 RUN select_source ${apt_source}
-#RUN install_pkg libssl1.1
+RUN install_pkg libssl1.1
 
 RUN create_user && prepare_env
 
