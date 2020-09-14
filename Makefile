@@ -20,20 +20,20 @@ build-arg+=--build-arg local_url=http://$(local_ip)/dist-files
 
 .PHONY: build build-debian build-alpine clean clearclean upgrade
 
-build-debian:
-	@echo "Build $(app_name):$(current_tag)-deb"
-	@docker build --force-rm $(build-arg) -t $(app_name):$(current_tag)-deb .
-	@echo "Add tag: $(app_name):latest-deb"
-	@docker tag $(app_name):$(current_tag)-deb $(app_name):latest-deb
+build: build-alpine build-debian
+	@echo "Build complete"
 
-build-alpine:
+build-debian:
 	@echo "Build $(app_name):$(current_tag)"
-	@docker build --force-rm $(build-arg) -t $(app_name):$(current_tag) ./alpine
+	@docker build --force-rm $(build-arg) -t $(app_name):$(current_tag) .
 	@echo "Add tag: $(app_name):latest"
 	@docker tag $(app_name):$(current_tag) $(app_name):latest
 
-build: build-debian build-alpine
-	@echo "Build complete"
+build-alpine:
+	@echo "Build $(app_name):$(current_tag)-alpine"
+	@docker build --force-rm $(build-arg) -t $(app_name):$(current_tag)-alpine ./alpine
+	@echo "Add tag: $(app_name):latest-alpine"
+	@docker tag $(app_name):$(current_tag)-alpine $(app_name):latest-alpine
 
 # 清理悬空的镜像（无TAG）及停止的容器 
 clearclean: clean
@@ -59,4 +59,4 @@ push: tag
 # 更新所有 colovu 仓库的镜像 
 upgrade: 
 	@echo "Upgrade all images..."
-	@docker images | grep 'colovu' | grep -v '<none>' | grep -v "latest-" | awk '{print $$1":"$$2}' | xargs -L 1 docker pull
+	@docker images | grep 'colovu' | grep -v '<none>' | grep -v "latest-" | awk '{print $$1":"$$2}' | sort -u | xargs -L 1 docker pull
