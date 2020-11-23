@@ -9,78 +9,22 @@
 . /usr/local/scripts/libfile.sh
 . /usr/local/scripts/libfs.sh
 . /usr/local/scripts/libos.sh
+. /usr/local/scripts/libnet.sh
 . /usr/local/scripts/libservice.sh
 . /usr/local/scripts/libvalidations.sh
 
 # 函数列表
 
-# 加载应用使用的环境变量初始值，该函数在相关脚本中以 eval 方式调用
-# 全局变量:
-#   ENV_* : 容器使用的全局变量
-#   APP_* : 在镜像创建时定义的全局变量
-#   *_* : 应用配置文件使用的全局变量，变量名根据配置项定义
-# 返回值:
-#   可以被 'eval' 使用的序列化输出
-app_env() {
-    cat <<-'EOF'
-# Common Settings
-export ENV_DEBUG=${ENV_DEBUG:-false}
-export ALLOW_ANONYMOUS_LOGIN="${ALLOW_ANONYMOUS_LOGIN:-no}"
-
-# Paths
-export REDIS_CONF_FILE="${APP_CONF_DIR}/redis.conf"
-export REDIS_SENTINEL_FILE="${APP_CONF_DIR}/sentinel.conf"
-export REDIS_PID_FILE="${APP_RUN_DIR}/redis.pid"
-
-# Users
-
-# Redis settings
-export REDIS_PORT="${REDIS_PORT:-6379}"
-export REDIS_DISABLE_COMMANDS="${REDIS_DISABLE_COMMANDS:-}"
-export REDIS_AOF_ENABLED="${REDIS_AOF_ENABLED:-yes}"
-
-# Cluster configuration
-export REDIS_SENTINEL_HOST="${REDIS_SENTINEL_HOST:-}"
-export REDIS_SENTINEL_MASTER_NAME="${REDIS_SENTINEL_MASTER_NAME:-}"
-export REDIS_SENTINEL_PORT_NUMBER="${REDIS_SENTINEL_PORT_NUMBER:-26379}"
-
-export REDIS_MASTER_HOST="${REDIS_MASTER_HOST:-}"
-export REDIS_MASTER_PORT_NUMBER="${REDIS_MASTER_PORT_NUMBER:-6379}"
-export REDIS_MASTER_PASSWORD="${REDIS_MASTER_PASSWORD:-}"
-export REDIS_REPLICATION_MODE="${REDIS_REPLICATION_MODE:-}"
-
-# Redis TLS Settings
-export REDIS_TLS_ENABLED="${REDIS_TLS_ENABLED:-no}"
-export REDIS_TLS_PORT="${REDIS_TLS_PORT:-6379}"
-export REDIS_TLS_CERT_FILE="${REDIS_TLS_CERT_FILE:-}"
-export REDIS_TLS_KEY_FILE="${REDIS_TLS_KEY_FILE:-}"
-export REDIS_TLS_CA_FILE="${REDIS_TLS_CA_FILE:-}"
-export REDIS_TLS_DH_PARAMS_FILE="${REDIS_TLS_DH_PARAMS_FILE:-}"
-export REDIS_TLS_AUTH_CLIENTS="${REDIS_TLS_AUTH_CLIENTS:-yes}"
-
-# Authentication
-export REDIS_PASSWORD="${REDIS_PASSWORD:-}"
-EOF
-
-    # 利用 *_FILE 设置密码，不在配置命令中设置密码，增强安全性
-    if [[ -f "${REDIS_PASSWORD_FILE:-}" ]]; then
-        cat <<"EOF"
-export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
-EOF
-    fi
-    
-    if [[ -f "${REDIS_MASTER_PASSWORD_FILE:-}" ]]; then
-        cat <<"EOF"
-export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
-EOF
-    fi
-
-    # 如果设置了用户密码，设置环境变量 REDISCLI_AUTH，用于 `redis-cli` 登录时使用；不显示输入，保证安全
-    if [[ -n "${REDIS_PASSWORD}" ]]; then
-        cat <<"EOF"
-export REDISCLI_AUTH=${REDIS_PASSWORD}
-EOF
-    fi
+# 使用环境变量中以 "APP_CFG_" 开头的的全局变量更新配置文件中对应项（全小写，以"."分隔）
+# 举例：
+#   APP_CFG_LOG_DIRS 对应配置文件中的配置项：log.dirs
+redis_configure_from_env_variables() {
+    # Map environment variables to config properties
+    for var in "${!APP_CFG_@}"; do
+        key="$(echo "$var" | sed -e 's/^APP_CFG_//g' -e 's/_/\./g' | tr '[:upper:]' '[:lower:]')"
+        value="${!var}"
+        redis_conf_set "$key" "$value"
+    done
 }
 
 # 将变量配置更新至配置文件
@@ -248,7 +192,7 @@ redis_configure_replication() {
             REDIS_MASTER_PORT_NUMBER=${REDIS_SENTINEL_INFO[1]}
         fi
         LOG_I "Waitting for Redis Master ready..."
-        wait-for-port --host "$REDIS_MASTER_HOST" "$REDIS_MASTER_PORT_NUMBER"
+        redis_wait_service "${REDIS_MASTER_HOST}:${REDIS_MASTER_PORT_NUMBER}"
         [[ -n "$REDIS_MASTER_PASSWORD" ]] && redis_conf_set masterauth "$REDIS_MASTER_PASSWORD"
         # Starting with Redis 5, use 'replicaof' instead of 'slaveof'. Maintaining both for backward compatibility
         local parameter="replicaof"
@@ -262,11 +206,10 @@ redis_configure_replication() {
 }
 
 # 检测用户参数信息是否满足条件; 针对部分权限过于开放情况，打印提示信息
-app_verify_minimum_env() {
+redis_verify_minimum_env() {
     local error_code=0
     LOG_D "Validating settings in REDIS_* env vars..."
 
-    # Auxiliary functions
     print_validation_error() {
         LOG_E "$1"
         error_code=1
@@ -323,16 +266,57 @@ app_verify_minimum_env() {
 }
 
 # 更改默认监听地址为 "*" 或 "0.0.0.0"，以对容器外提供服务；默认配置文件应当为仅监听 localhost(127.0.0.1)
-app_enable_remote_connections() {
+redis_enable_remote_connections() {
     LOG_D "Modify default config to enable all IP access"
 
     redis_conf_set daemonize no
     redis_conf_set bind 0.0.0.0 # Allow remote connections
 }
 
+# 检测依赖的服务端口是否就绪；该脚本依赖系统工具 'netcat'
+# 参数:
+#   $1 - host:port
+redis_wait_service() {
+    local serviceport=${1:?Missing server info}
+    local service=${serviceport%%:*}
+    local port=${serviceport#*:}
+    local retry_seconds=5
+    local max_try=100
+    let i=1
+
+    if [[ -z "$(which nc)" ]]; then
+        LOG_E "Nedd nc installed before, command: \"apt-get install netcat\"."
+        exit 1
+    fi
+
+    LOG_I "[0/${max_try}] check for ${service}:${port}..."
+
+    set +e
+    nc -z ${service} ${port}
+    result=$?
+
+    until [ $result -eq 0 ]; do
+      LOG_D "  [$i/${max_try}] not available yet"
+      if (( $i == ${max_try} )); then
+        LOG_E "${service}:${port} is still not available; giving up after ${max_try} tries."
+        exit 1
+      fi
+      
+      LOG_I "[$i/${max_try}] try in ${retry_seconds}s once again ..."
+      let "i++"
+      sleep ${retry_seconds}
+
+      nc -z ${service} ${port}
+      result=$?
+    done
+
+    set -e
+    LOG_I "[$i/${max_try}] ${service}:${port} is available."
+}
+
 # 以后台方式启动应用服务，并等待启动就绪
-app_start_server_bg() {
-    is_app_server_running && return
+redis_start_server_bg() {
+    redis_is_server_running && return
 
     LOG_I "Starting ${APP_NAME} in background..."
 
@@ -343,7 +327,7 @@ app_start_server_bg() {
     fi
 
     local counter=3
-    while ! is_app_server_running ; do
+    while ! redis_is_server_running ; do
         if [[ "$counter" -ne 0 ]]; then
             break
         fi
@@ -359,8 +343,8 @@ app_start_server_bg() {
 }
 
 # 停止应用服务
-app_stop_server() {
-    is_app_server_running || return
+redis_stop_server() {
+    redis_is_server_running || return
 
     local pass
     local port
@@ -390,7 +374,7 @@ app_stop_server() {
 }
 
 # 检测应用服务是否在后台运行中
-is_app_server_running() {
+redis_is_server_running() {
     LOG_D "Check if ${APP_NAME} is running..."
     local pid
     pid="$(get_pid_from_file "${REDIS_PID_FILE}")"
@@ -403,13 +387,13 @@ is_app_server_running() {
 }
 
 # 清理初始化应用时生成的临时文件
-app_clean_tmp_file() {
+redis_clean_tmp_file() {
     LOG_D "Clean ${APP_NAME} tmp files for init..."
 
 }
 
 # 在重新启动容器时，删除标志文件及必须删除的临时文件 (容器重新启动)
-app_clean_from_restart() {
+redis_clean_from_restart() {
     LOG_D "Clean ${APP_NAME} tmp files for restart..."
     local -r -a files=(
         "${REDIS_PID_FILE}"
@@ -425,8 +409,8 @@ app_clean_from_restart() {
 
 # 应用默认初始化操作
 # 执行完毕后，生成文件 ${APP_CONF_DIR}/.app_init_flag 及 ${APP_DATA_DIR}/.data_init_flag 文件
-app_default_init() {
-	app_clean_from_restart
+redis_default_init() {
+	redis_clean_from_restart
     LOG_D "Check init status of ${APP_NAME}..."
 
     # 检测配置文件是否存在
@@ -439,15 +423,17 @@ app_default_init() {
             redis_configure_replication
         fi
 
-        touch ${APP_CONF_DIR}/.app_init_flag
-        echo "$(date '+%Y-%m-%d %H:%M:%S') : Init success." >> ${APP_CONF_DIR}/.app_init_flag
+        touch "${APP_CONF_DIR}/.app_init_flag"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') : Init success." >> "${APP_CONF_DIR}/.app_init_flag"
     else
         LOG_I "User injected custom configuration detected!"
     fi
 
     if [[ ! -f "${APP_DATA_DIR}/.data_init_flag" ]]; then
         LOG_I "Deploying ${APP_NAME} from scratch..."
-        #app_start_server_bg
+
+		# 启动后台服务
+        #redis_start_server_bg
 
 
         touch ${APP_DATA_DIR}/.data_init_flag
@@ -459,8 +445,8 @@ app_default_init() {
 
 # 用户自定义的前置初始化操作，依次执行目录 preinitdb.d 中的初始化脚本
 # 执行完毕后，生成文件 ${APP_DATA_DIR}/.custom_preinit_flag
-app_custom_preinit() {
-    LOG_D "Check custom pre-init status of ${APP_NAME}..."
+redis_custom_preinit() {
+    LOG_I "Check custom pre-init status of ${APP_NAME}..."
 
     # 检测用户配置文件目录是否存在 preinitdb.d 文件夹，如果存在，尝试执行目录中的初始化脚本
     if [ -d "/srv/conf/${APP_NAME}/preinitdb.d" ]; then
@@ -472,8 +458,8 @@ app_custom_preinit() {
             # 检索所有可执行脚本，排序后执行
             find "/srv/conf/${APP_NAME}/preinitdb.d/" -type f -regex ".*\.\(sh\)" | sort | process_init_files
 
-            touch ${APP_DATA_DIR}/.custom_preinit_flag
-            echo "$(date '+%Y-%m-%d %H:%M:%S') : Init success." >> ${APP_DATA_DIR}/.custom_preinit_flag
+            touch "${APP_DATA_DIR}/.custom_preinit_flag"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') : Init success." >> "${APP_DATA_DIR}/.custom_preinit_flag"
             LOG_I "Custom preinit for ${APP_NAME} complete."
         else
             LOG_I "Custom preinit for ${APP_NAME} already done before, skipping initialization."
@@ -482,14 +468,14 @@ app_custom_preinit() {
 
     # 检测依赖的服务是否就绪
     #for i in ${SERVICE_PRECONDITION[@]}; do
-    #    app_wait_service "${i}"
+    #    redis_wait_service "${i}"
     #done
 }
 
 # 用户自定义的应用初始化操作，依次执行目录initdb.d中的初始化脚本
 # 执行完毕后，生成文件 ${APP_DATA_DIR}/.custom_init_flag
-app_custom_init() {
-    LOG_D "Check custom init status of ${APP_NAME}..."
+redis_custom_init() {
+    LOG_I "Check custom initdb status of ${APP_NAME}..."
 
     # 检测用户配置文件目录是否存在 initdb.d 文件夹，如果存在，尝试执行目录中的初始化脚本
     if [ -d "/srv/conf/${APP_NAME}/initdb.d" ]; then
@@ -498,7 +484,8 @@ app_custom_init() {
             [[ ! -f "${APP_DATA_DIR}/.custom_init_flag" ]]; then
             LOG_I "Process custom init scripts from /srv/conf/${APP_NAME}/initdb.d..."
 
-            #app_start_server_bg
+            # 启动后台服务
+            #redis_start_server_bg
 
             # 检索所有可执行脚本，排序后执行
     		find "/srv/conf/${APP_NAME}/initdb.d/" -type f -regex ".*\.\(sh\|sql\|sql.gz\)" | sort | while read -r f; do
@@ -510,12 +497,21 @@ app_custom_init() {
                             LOG_D "Sourcing $f"; . "$f"
                         fi
                         ;;
-                    *)        LOG_D "Ignoring $f" ;;
+                    *.sql)    
+                        LOG_D "Executing $f"; 
+                        postgresql_execute "${PG_DATABASE}" "${PG_INITSCRIPTS_USERNAME}" "${PG_INITSCRIPTS_PASSWORD}" < "$f"
+                        ;;
+                    *.sql.gz) 
+                        LOG_D "Executing $f"; 
+                        gunzip -c "$f" | postgresql_execute "${PG_DATABASE}" "${PG_INITSCRIPTS_USERNAME}" "${PG_INITSCRIPTS_PASSWORD}"
+                        ;;
+                    *)        
+                        LOG_D "Ignoring $f" ;;
                 esac
             done
 
-            touch ${APP_DATA_DIR}/.custom_init_flag
-    		echo "$(date '+%Y-%m-%d %H:%M:%S') : Init success." >> ${APP_DATA_DIR}/.custom_init_flag
+            touch "${APP_DATA_DIR}/.custom_init_flag"
+    		echo "$(date '+%Y-%m-%d %H:%M:%S') : Init success." >> "${APP_DATA_DIR}/.custom_init_flag"
     		LOG_I "Custom init for ${APP_NAME} complete."
     	else
     		LOG_I "Custom init for ${APP_NAME} already done before, skipping initialization."
@@ -523,11 +519,12 @@ app_custom_init() {
     fi
 
     # 检测服务是否运行中；如果运行，则停止后台服务
-	is_app_server_running && app_stop_server
+	redis_is_server_running && redis_stop_server
 
     # 删除第一次运行生成的临时文件
-    app_clean_tmp_file
+    redis_clean_tmp_file
 
 	# 绑定所有 IP ，启用远程访问
-    app_enable_remote_connections
+    redis_enable_remote_connections
 }
+

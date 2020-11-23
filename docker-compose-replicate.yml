@@ -3,10 +3,10 @@ version: '3.8'
 # 可以使用 scale 动态扩容容器：docker-compose scale redis-replica=3
 
 services:
-  redis-primary:
+  redis:
     image: 'colovu/redis'
     ports:
-      - '6379:6379'
+      - '6379'
     environment:
       - REDIS_REPLICATION_MODE=master
       - REDIS_PASSWORD=colovu
@@ -20,13 +20,13 @@ services:
       - '6379'
     environment:
       - REDIS_REPLICATION_MODE=slave
-      - REDIS_MASTER_HOST=redis-primary
+      - REDIS_MASTER_HOST=redis
       - REDIS_MASTER_PORT_NUMBER=6379
       - REDIS_MASTER_PASSWORD=colovu
       - REDIS_PASSWORD=colovu
       - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
     depends_on:
-      - redis-primary
+      - redis
 
 # 定义本地数据卷，由系统管理，需要手动删除
 volumes:

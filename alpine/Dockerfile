@@ -1,4 +1,4 @@
-# Ver: 1.2 by Endial Fang (endial@126.com)
+# Ver: 1.3 by Endial Fang (endial@126.com)
 #
 
 # 预处理 =========================================================================
@@ -10,7 +10,8 @@ ARG apt_source=default
 # 编译镜像时指定用于加速的本地服务器地址
 ARG local_url=""
 
-WORKDIR /usr/local
+ENV APP_NAME=redis \
+	APP_VERSION=6.0.8
 
 RUN select_source ${apt_source};
 #RUN install_pkg xz-utils
@@ -26,25 +27,27 @@ RUN set -eux; \
 	download_pkg unpack ${appName} "${appUrls}"; \
 	chmod +x /usr/local/wait-for-port-1.0.0-1-linux-amd64-debian-10/files/common/bin/wait-for-port;
 
+# 下载并解压软件包
 RUN set -eux; \
-	appVersion=6.0.8; \
-	appName="redis-${appVersion}.tar.gz"; \
+	appName="${APP_NAME}-${APP_VERSION}.tar.gz"; \
 	sha256="04fa1fddc39bd1aecb6739dd5dd73858a3515b427acd1e2947a66dadce868d68"; \
-	[ ! -z ${local_url} ] && localURL=${local_url}/redis; \
+	[ ! -z ${local_url} ] && localURL=${local_url}/${APP_NAME}; \
 	appUrls="${localURL:-} \
 		http://download.redis.io/releases \
 		"; \
-	download_pkg unpack ${appName} "${appUrls}" -s "${sha256}"; \
-	mkdir -p /usr/local/redis; \
-	cd /usr/local/redis-${appVersion}; \
+	download_pkg unpack ${appName} "${appUrls}" -s "${sha256}";
+
+# 源码编译: 编译后将配置文件模板拷贝至 /usr/local/${APP_NAME}/share/${APP_NAME} 中
+RUN set -eux; \
+	APP_SRC="/usr/local/${APP_NAME}-${APP_VERSION}"; \
+	cd ${APP_SRC}; \
 # 禁用安全保护模式，在 Docker 中运行时不需要
-	grep -E '^ *createBoolConfig[(]"protected-mode",.*, *1 *,.*[)],$' /usr/local/redis-${appVersion}/src/config.c; \
-	sed -ri 's!^( *createBoolConfig[(]"protected-mode",.*, *)1( *,.*[)],)$!\10\2!' /usr/local/redis-${appVersion}/src/config.c; \
-	grep -E '^ *createBoolConfig[(]"protected-mode",.*, *0 *,.*[)],$' /usr/local/redis-${appVersion}/src/config.c; \
+	grep -E '^ *createBoolConfig[(]"protected-mode",.*, *1 *,.*[)],$' ./src/config.c; \
+	sed -ri 's!^( *createBoolConfig[(]"protected-mode",.*, *)1( *,.*[)],)$!\10\2!' ./src/config.c; \
+	grep -E '^ *createBoolConfig[(]"protected-mode",.*, *0 *,.*[)],$' ./src/config.c; \
 	make MALLOC=libc BUILD_TLS=yes \
 		-j "$(nproc)" all; \
-	make PREFIX=/usr/local/redis install; \
-	\
+	make PREFIX=/usr/local/${APP_NAME} install;  \
 # 删除重复的应用程序，并生成对应的连接
 	serverMd5="$(md5sum /usr/local/redis/bin/redis-server | cut -d' ' -f1)"; export serverMd5; \
 	find /usr/local/redis/bin/redis* -maxdepth 0 \
@@ -55,9 +58,18 @@ RUN set -eux; \
 		' -- '{}' ';' \
 		-exec ln -svfT 'redis-server' '{}' ';' ; 
 
+# 删除编译生成的多余文件
+RUN set -eux; \
+	find /usr/local -name '*.a' -delete; \
+	rm -rf /usr/local/${APP_NAME}/include;
 
-
-#find /usr/local/redis/bin -type f -executable -exec ldd '{}' ';' | awk '/=>/ { print $(NF-1) }' | sort -u | xargs -r dpkg-query --search | cut -d: -f1 | sort -u
+# 检测并生成依赖文件记录
+RUN set -eux; \
+	scanelf --needed --nobanner --format '%n#p' --recursive /usr/local/${APP_NAME} | \
+		tr ',' '\n' | \
+		sort -u | \
+		awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } \
+		{ print "so:" $1 }' >/usr/local/${APP_NAME}/runDeps;
 
 # 镜像生成 ========================================================================
 FROM colovu/alpine:3.12
@@ -71,17 +83,10 @@ ENV APP_NAME=redis \
 	APP_VERSION=6.0.8
 
 ENV	APP_HOME_DIR=/usr/local/${APP_NAME} \
-	APP_DEF_DIR=/etc/${APP_NAME} \
-	APP_CONF_DIR=/srv/conf/${APP_NAME} \
-	APP_DATA_DIR=/srv/data/${APP_NAME} \
-	APP_DATA_LOG_DIR=/srv/datalog/${APP_NAME} \
-	APP_CACHE_DIR=/var/cache/${APP_NAME} \
-	APP_RUN_DIR=/var/run/${APP_NAME} \
-	APP_LOG_DIR=/var/log/${APP_NAME} \
-	APP_CERT_DIR=/srv/cert/${APP_NAME}
+	APP_DEF_DIR=/etc/${APP_NAME}
 
-ENV \
-	PATH="${APP_HOME_DIR}/bin:${PATH}"
+ENV PATH="${APP_HOME_DIR}/bin:${PATH}" \
+	LD_LIBRARY_PATH="${APP_HOME_DIR}/lib"
 
 LABEL \
 	"Version"="v${APP_VERSION}" \
@@ -89,18 +94,19 @@ LABEL \
 	"Dockerfile"="https://github.com/colovu/docker-${APP_NAME}" \
 	"Vendor"="Endial Fang (endial@126.com)"
 
-COPY customer /
-
-# 以包管理方式安装软件包(Optional)
+# 选择软件包源
 RUN select_source ${apt_source}
-#RUN install_pkg libssl1.1
 
+COPY customer /
 RUN create_user && prepare_env
 
 # 从预处理过程中拷贝软件包(Optional)
 COPY --from=builder /usr/local/wait-for-port-1.0.0-1-linux-amd64-debian-10/files/common/bin/ /usr/local/bin/
-COPY --from=builder /usr/local/redis /usr/local/redis
-COPY --from=builder /usr/local/redis-${APP_VERSION}/*.conf ${APP_DEF_DIR}/
+COPY --from=builder /usr/local/${APP_NAME}/ /usr/local/${APP_NAME}
+COPY --from=builder /usr/local/${APP_NAME}-${APP_VERSION}/*.conf /etc/${APP_NAME}/
+
+# 安装依赖的软件包及库(Optional)
+RUN install_pkg `cat /usr/local/${APP_NAME}/runDeps`; 
 
 # 执行预处理脚本，并验证安装的软件包
 RUN set -eux; \
@@ -108,7 +114,7 @@ RUN set -eux; \
 	[ -e "${override_file}" ] && /bin/bash "${override_file}"; \
 	gosu ${APP_USER} redis-cli --version; \
 	gosu ${APP_USER} redis-server --version; \
-	:;
+	gosu --version;
 
 # 默认提供的数据卷
 VOLUME ["/srv/conf", "/srv/data", "/srv/datalog", "/srv/cert", "/var/log"]
