@@ -14,14 +14,20 @@ set -o pipefail
 
 LOG_I "** Processing run.sh **"
 
-flags=("${APP_CONF_FILE:-}")
-[[ -z "${APP_EXTRA_FLAGS:-}" ]] || flags=("${flags[@]}" "${APP_EXTRA_FLAGS[@]}")
-START_COMMAND=("${APP_EXEC:-/bin/bash}")
+# 配置默认启动参数（应用配置文件、前台方式启动）
+flags=("${REDIS_CONF_FILE:-}" "--daemonize" "no")
+# 将启动时使用 REDIS_EXTRA_FLAGS 指定的参数附加在启动参数中
+[[ -z "${REDIS_EXTRA_FLAGS:-}" ]] || flags+=("${REDIS_EXTRA_FLAGS[@]}")
+# 将启动时的传入参数附加在参数中
+flags+=("$@")
+
+# 设置启动命令
+START_COMMAND=("redis-server")
 
 LOG_I "** Starting ${APP_NAME} **"
 if is_root; then
-    exec gosu "${APP_USER}" tini -s -- "${START_COMMAND[@]}" "${flags[@]}"
+    exec gosu "${APP_USER}" "${START_COMMAND[@]}" "${flags[@]}"
 else
-    exec tini -s -- "${START_COMMAND[@]}" "${flags[@]}"
+    exec "${START_COMMAND[@]}" "${flags[@]}"
 fi
 

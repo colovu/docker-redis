@@ -69,7 +69,7 @@ ARG local_url=""
 
 ENV APP_NAME=redis \
 	APP_USER=redis \
-	APP_EXEC=redis-server \
+	APP_EXEC=run.sh \
 	APP_VERSION=6.0.8
 
 ENV	APP_HOME_DIR=/usr/local/${APP_NAME} \
@@ -96,6 +96,7 @@ COPY --from=builder /usr/local/${APP_NAME}-${APP_VERSION}/*.conf /etc/${APP_NAME
 
 # 安装依赖的软件包及库(Optional)
 RUN install_pkg `cat /usr/local/${APP_NAME}/runDeps`; 
+RUN install_pkg netcat;
 
 # 执行预处理脚本，并验证安装的软件包
 RUN set -eux; \
@@ -115,5 +116,5 @@ EXPOSE 6379
 ENTRYPOINT ["entry.sh"]
 
 # 应用程序的服务命令，必须使用非守护进程方式运行。如果使用变量，则该变量必须在运行环境中存在（ENV可以获取）
-CMD ["${APP_EXEC}", "${REDIS_CONF_FILE}"]
+CMD ["${APP_EXEC}"]
 
