@@ -18,17 +18,6 @@ RUN select_source ${apt_source};
 
 # 下载并解压软件包
 RUN set -eux; \
-	appVersion=1.0.0; \
-	appName="wait-for-port-${appVersion}-1-linux-amd64-debian-10.tar.gz"; \
-	[ ! -z ${local_url} ] && localURL=${local_url}/bitnami; \
-	appUrls="${localURL:-} \
-		https://downloads.bitnami.com/files/stacksmith \
-		"; \
-	download_pkg unpack ${appName} "${appUrls}"; \
-	chmod +x /usr/local/wait-for-port-1.0.0-1-linux-amd64-debian-10/files/common/bin/wait-for-port;
-
-# 下载并解压软件包
-RUN set -eux; \
 	appName="${APP_NAME}-${APP_VERSION}.tar.gz"; \
 	sha256="04fa1fddc39bd1aecb6739dd5dd73858a3515b427acd1e2947a66dadce868d68"; \
 	[ ! -z ${local_url} ] && localURL=${local_url}/${APP_NAME}; \
@@ -102,7 +91,6 @@ COPY customer /
 RUN create_user && prepare_env
 
 # 从预处理过程中拷贝软件包(Optional)
-COPY --from=builder /usr/local/wait-for-port-1.0.0-1-linux-amd64-debian-10/files/common/bin/ /usr/local/bin/
 COPY --from=builder /usr/local/${APP_NAME}/ /usr/local/${APP_NAME}
 COPY --from=builder /usr/local/${APP_NAME}-${APP_VERSION}/*.conf /etc/${APP_NAME}/
 
