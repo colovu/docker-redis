@@ -337,7 +337,7 @@ redis_start_server_bg() {
 
 	# 通过命令或特定端口检测应用是否就绪
     LOG_I "Checking ${APP_NAME} ready status..."
-    #wait-for-port --timeout 60 "$REDIS_PORT_NUMBER"
+    #wait-for-port --timeout 60 "$REDIS_PORT"
 
     LOG_D "${APP_NAME} is ready for service..."
 }
