@@ -34,7 +34,6 @@ RUN set -eux; \
 	grep -q '^#define CONFIG_DEFAULT_PROTECTED_MODE 1$' ./src/server.h; \
 	sed -ri 's!^(#define CONFIG_DEFAULT_PROTECTED_MODE) 1$!\1 0!' ./src/server.h; \
 	grep -q '^#define CONFIG_DEFAULT_PROTECTED_MODE 0$' ./src/server.h; \
-
 	make MALLOC=libc BUILD_TLS=yes \
 		-j "$(nproc)" all; \
 	make PREFIX=/usr/local/${APP_NAME} install;  \
