@@ -15,7 +15,7 @@
 
 **镜像信息：**
 
-* 镜像地址：colovu/redis:latest
+* 镜像地址：registry.cn-shenzhen.aliyuncs.com/colovu/redis:6.0
 
 
 
@@ -24,7 +24,7 @@
 Docker 快速启动命令：
 
 ```shell
-$ docker run -d -e ALLOW_ANONYMOUS_LOGIN=yes colovu/redis
+$ docker run -d -e ALLOW_ANONYMOUS_LOGIN=yes registry.cn-shenzhen.aliyuncs.com/colovu/redis:6.0
 ```
 
 Docker-Compose 快速启动命令：
@@ -171,8 +171,8 @@ services:
 
 ## 历史记录
 
-- 2020.9.11：更新 Redis 版本为 6.0.8
-
+- 2020.9.11： 更新 Redis 版本为 6.0.8
+- 2020.9.11： 更新 Redis 版本为 5.0.9
 
 ----
 
