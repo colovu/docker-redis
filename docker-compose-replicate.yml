@@ -4,7 +4,7 @@ version: '3.8'
 
 services:
   redis:
-    image: 'colovu/redis5.0'
+    image: 'registry.cn-shenzhen.aliyuncs.com/colovu/redis:5.0'
     ports:
       - '6379'
     environment:
@@ -15,7 +15,7 @@ services:
       - 'redis_data:/srv/data'
 
   redis-replica:
-    image: 'colovu/redis5.0'
+    image: 'registry.cn-shenzhen.aliyuncs.com/colovu/redis:5.0'
     ports:
       - '6379'
     environment:

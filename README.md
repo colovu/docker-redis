@@ -15,7 +15,7 @@
 
 **镜像信息：**
 
-* 镜像地址：colovu/redis:latest
+* 镜像地址：registry.cn-shenzhen.aliyuncs.com/colovu/redis:5.0
 
 
 
@@ -24,7 +24,7 @@
 Docker 快速启动命令：
 
 ```shell
-$ docker run -d -e ALLOW_ANONYMOUS_LOGIN=yes colovu/redis
+$ docker run -d -e ALLOW_ANONYMOUS_LOGIN=yes registry.cn-shenzhen.aliyuncs.com/colovu/redis:5.0
 ```
 
 Docker-Compose 快速启动命令：
@@ -167,6 +167,7 @@ services:
 ## 注意事项
 
 - 容器中 Redis 启动参数不能配置为后台运行，只能使用前台运行方式，即：`daemonize no`
+
 
 ## 历史记录
 
