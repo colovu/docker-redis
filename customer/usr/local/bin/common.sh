@@ -1,5 +1,5 @@
 #!/bin/bash
-# Ver: 1.0 by Endial Fang (endial@126.com)
+# Ver: 1.1 by Endial Fang (endial@126.com)
 # 
 # 应用通用业务处理函数
 
@@ -8,8 +8,8 @@
 
 . /usr/local/scripts/libfile.sh
 . /usr/local/scripts/libfs.sh
+. /usr/local/scripts/liblog.sh
 . /usr/local/scripts/libos.sh
-. /usr/local/scripts/libnet.sh
 . /usr/local/scripts/libservice.sh
 . /usr/local/scripts/libvalidations.sh
 
@@ -384,6 +384,10 @@ redis_is_server_running() {
     else
         is_service_running "${pid}"
     fi
+}
+
+redis_is_server_not_running() {
+	! redis_is_server_running
 }
 
 # 清理初始化应用时生成的临时文件
