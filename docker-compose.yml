@@ -1,10 +1,10 @@
 version: '3.8'
 
-# Docker-Compose 单容器使用参考 YAML 配置文件
-# 更多配置参数请参考镜像 README.md 文档中说明
+# Docker-Compose 方式启动容器的 YAML 配置文件
+# 当前配置仅保证可以启动容器；更多配置参数请参考镜像 README.md 文档中说明
 services:
   redis:
-    image: 'registry.cn-shenzhen.aliyuncs.com/colovu/redis:6.0'
+    image: 'colovu/redis:latest'
     ports:
       - '6379:6379'
     environment:
@@ -16,5 +16,9 @@ services:
 
 # 定义本地数据卷，由系统管理，需要手动删除
 volumes:
-  redis_data:
+  app_conf:
+    driver: local
+  app_data:
+    driver: local
+  var_log:
     driver: local
